@@ -1,4 +1,14 @@
 # Railway用Dockerfile
+FROM node:18-alpine AS frontend-builder
+
+# フロントエンドをビルド
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ .
+RUN npm run build
+
+# 本番用イメージ
 FROM python:3.9-slim
 
 # システムパッケージの更新とFFmpegのインストール
@@ -16,15 +26,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # アプリケーションコードをコピー
 COPY backend/ .
 
-# フロントエンドをビルド
-COPY frontend/package*.json ./frontend/
-WORKDIR /app/frontend
-RUN npm install
-COPY frontend/ .
-RUN npm run build
+# フロントエンドのビルド結果をコピー
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # 静的ファイルを配信するための設定
-WORKDIR /app
 RUN pip install aiofiles
 
 # ポート設定
