@@ -118,6 +118,24 @@ railway variables set SEGMENTS_DIR=/tmp/swipecut/segments
 railway variables set EXPORT_DIR=/tmp/swipecut/export
 ```
 
+### 6. カスタムドメイン設定
+```bash
+# カスタムドメインを追加
+railway domain add swipecut.kotaro-design-lab.com
+```
+
+#### DNS設定（ドメインプロバイダー側）
+```
+Type: CNAME
+Name: swipecut
+Value: [Railwayが提供するドメイン]
+TTL: 300
+```
+
+#### アクセスURL
+- **本番環境**: `https://swipecut.kotaro-design-lab.com`
+- **開発環境**: `http://localhost:5173`
+
 ## その他のデプロイ方法
 
 ### Render

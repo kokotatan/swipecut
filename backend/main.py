@@ -15,12 +15,18 @@ from video import split_video, create_zip_archive
 
 app = FastAPI(title="SwipeCut API", version="1.0.0")
 
-# CORS設定
+# CORS設定（本番環境用）
+ALLOWED_ORIGINS = [
+    "https://swipecut.kotaro-design-lab.com",
+    "http://localhost:5173",  # 開発環境用
+    "http://localhost:3000",  # 開発環境用
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
