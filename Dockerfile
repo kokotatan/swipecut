@@ -35,5 +35,8 @@ RUN pip install aiofiles
 # ポート設定
 EXPOSE 8000
 
+# 起動スクリプトをコピー
+COPY start.py .
+
 # 起動コマンド
-CMD ["sh", "-c", "echo 'Starting SwipeCut API...' && python3 -m uvicorn main:app --host 0.0.0.0 --port $PORT"]
+CMD ["python3", "start.py"]
