@@ -33,10 +33,6 @@ app.add_middleware(
 # データベーステーブル作成
 create_tables()
 
-# 静的ファイル配信（フロントエンド用）
-if os.path.exists("../frontend/dist"):
-    app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
-
 # 環境に応じたディレクトリ設定
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "data/original")
 SEGMENTS_DIR = os.getenv("SEGMENTS_DIR", "data/segments")
@@ -47,10 +43,25 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(SEGMENTS_DIR, exist_ok=True)
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
-# ヘルスチェック用のルートエンドポイント
+# ヘルスチェック用のエンドポイント
+@app.get("/health")
+async def health_check():
+    import os
+    return {
+        "message": "SwipeCut API is running", 
+        "status": "healthy",
+        "port": os.getenv("PORT", "8000"),
+        "frontend_exists": os.path.exists("frontend/dist")
+    }
+
+# ルートエンドポイント（静的ファイル配信の前に定義）
 @app.get("/")
 async def root():
     return {"message": "SwipeCut API is running", "status": "healthy"}
+
+# 静的ファイル配信（フロントエンド用）
+if os.path.exists("frontend/dist"):
+    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
 
 @app.post("/api/upload")
 async def upload_video(
