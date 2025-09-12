@@ -56,14 +56,14 @@ npm run dev
 
 ### エンドポイント
 
-- `POST /upload?chunk_sec=60` - 動画アップロード＆分割
-- `GET /next_segment?video_id` - 次の未判定セグメント取得
-- `POST /decide?segment_id=&decision=keep|drop` - 判定保存
-- `GET /progress?video_id` - 進捗状況取得
-- `POST /name?segment_id=&name=` - セグメント命名
-- `GET /export?video_id` - KeepメタデータJSON出力
-- `GET /export_zip?video_id` - KeepセグメントZIP出力
-- `GET /file?path` - ローカルファイル配信
+- `POST /api/upload?chunk_sec=60` - 動画アップロード＆分割
+- `GET /api/next_segment?video_id` - 次の未判定セグメント取得
+- `POST /api/decide?segment_id=&decision=keep|drop` - 判定保存
+- `GET /api/progress?video_id` - 進捗状況取得
+- `POST /api/name?segment_id=&name=` - セグメント命名
+- `GET /api/export?video_id` - KeepメタデータJSON出力
+- `GET /api/export_zip?video_id` - KeepセグメントZIP出力
+- `GET /api/file?path` - ローカルファイル配信
 
 ## プロジェクト構造
 
@@ -83,40 +83,57 @@ swipecut/
 │   │   └── styles.css
 │   ├── package.json
 │   └── vite.config.js
+├── Dockerfile        # Railway用
+├── railway.json      # Railway設定
 ├── .gitignore
 └── README.md
 ```
 
-## デプロイ（Vercel）
+## デプロイ（Railway - 推奨）
 
-### 1. Vercel CLIのインストール
+### 1. Railway CLIのインストール
 ```bash
-npm i -g vercel
+npm install -g @railway/cli
 ```
 
-### 2. デプロイ
+### 2. ログイン
 ```bash
-# プロジェクトルートで実行
-vercel
-
-# 本番デプロイ
-vercel --prod
+railway login
 ```
 
-### 3. 環境変数設定
-Vercelダッシュボードで以下の環境変数を設定：
-- `PYTHONPATH`: `/var/task/backend`
-- `NODE_ENV`: `production`
+### 3. プロジェクト作成
+```bash
+railway init
+```
 
-### 4. 制限事項
-- **ファイル保存**: 一時ディレクトリに保存（再起動で削除）
-- **データベース**: SQLite（永続化されない）
-- **FFmpeg**: Vercel Functionsでは利用不可
+### 4. デプロイ
+```bash
+railway up
+```
 
-### 本格運用の場合
-- **AWS**: EC2 + S3 + RDS
-- **Google Cloud**: Cloud Run + Cloud Storage + Cloud SQL
-- **Railway**: 簡単デプロイ、FFmpeg対応
+### 5. 環境変数設定（オプション）
+```bash
+railway variables set UPLOAD_DIR=/tmp/swipecut/original
+railway variables set SEGMENTS_DIR=/tmp/swipecut/segments
+railway variables set EXPORT_DIR=/tmp/swipecut/export
+```
+
+## その他のデプロイ方法
+
+### Render
+- **無料枠**: 月750時間
+- **FFmpeg対応**: ✅
+- **制限**: 15分でスリープ
+
+### Fly.io
+- **無料枠**: 月2340時間
+- **FFmpeg対応**: ✅
+- **Docker**: 完全対応
+
+### Google Cloud Run
+- **無料枠**: 月200万リクエスト
+- **FFmpeg対応**: ✅
+- **スケーリング**: 自動
 
 ## ライセンス
 

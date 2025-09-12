@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
@@ -14,7 +15,7 @@ from video import split_video, create_zip_archive
 
 app = FastAPI(title="SwipeCut API", version="1.0.0")
 
-# CORS設定（開発用）
+# CORS設定
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,7 +27,21 @@ app.add_middleware(
 # データベーステーブル作成
 create_tables()
 
-@app.post("/upload")
+# 静的ファイル配信（フロントエンド用）
+if os.path.exists("../frontend/dist"):
+    app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
+
+# 環境に応じたディレクトリ設定
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "data/original")
+SEGMENTS_DIR = os.getenv("SEGMENTS_DIR", "data/segments")
+EXPORT_DIR = os.getenv("EXPORT_DIR", "data/export")
+
+# ディレクトリ作成
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(SEGMENTS_DIR, exist_ok=True)
+os.makedirs(EXPORT_DIR, exist_ok=True)
+
+@app.post("/api/upload")
 async def upload_video(
     file: UploadFile = File(...),
     chunk_sec: int = Query(60, description="分割秒数"),
@@ -35,10 +50,7 @@ async def upload_video(
     """動画アップロード＆分割"""
     try:
         # ファイル保存
-        upload_dir = "data/original"
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        file_path = os.path.join(upload_dir, file.filename)
+        file_path = os.path.join(UPLOAD_DIR, file.filename)
         with open(file_path, "wb") as buffer:
             content = await file.read()
             buffer.write(content)
@@ -50,8 +62,7 @@ async def upload_video(
         db.refresh(video)
         
         # 動画分割
-        segments_dir = "data/segments"
-        segments_data = split_video(file_path, segments_dir, chunk_sec)
+        segments_data = split_video(file_path, SEGMENTS_DIR, chunk_sec)
         
         # セグメントをデータベースに記録
         for i, (start_sec, end_sec, segment_path) in enumerate(segments_data):
@@ -72,7 +83,7 @@ async def upload_video(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/next_segment")
+@app.get("/api/next_segment")
 async def get_next_segment(
     video_id: int = Query(...),
     db: Session = Depends(get_db)
@@ -96,7 +107,7 @@ async def get_next_segment(
         "name": segment.name
     }
 
-@app.post("/decide")
+@app.post("/api/decide")
 async def decide_segment(
     segment_id: int = Query(...),
     decision: str = Query(..., regex="^(keep|drop)$"),
@@ -112,7 +123,7 @@ async def decide_segment(
     
     return {"status": "success"}
 
-@app.get("/progress")
+@app.get("/api/progress")
 async def get_progress(
     video_id: int = Query(...),
     db: Session = Depends(get_db)
@@ -132,7 +143,7 @@ async def get_progress(
         "pending": pending
     }
 
-@app.post("/name")
+@app.post("/api/name")
 async def set_segment_name(
     segment_id: int = Query(...),
     name: str = Query(...),
@@ -148,7 +159,7 @@ async def set_segment_name(
     
     return {"status": "success"}
 
-@app.get("/export")
+@app.get("/api/export")
 async def export_kept_segments(
     video_id: int = Query(...),
     db: Session = Depends(get_db)
@@ -175,16 +186,13 @@ async def export_kept_segments(
     }
     
     # エクスポートディレクトリに保存
-    export_dir = "data/export"
-    os.makedirs(export_dir, exist_ok=True)
-    
-    export_path = os.path.join(export_dir, f"video_{video_id}_manifest.json")
+    export_path = os.path.join(EXPORT_DIR, f"video_{video_id}_manifest.json")
     with open(export_path, "w") as f:
         json.dump(manifest, f, indent=2)
     
     return manifest
 
-@app.get("/export_zip")
+@app.get("/api/export_zip")
 async def export_zip(
     video_id: int = Query(...),
     db: Session = Depends(get_db)
@@ -199,10 +207,7 @@ async def export_zip(
         raise HTTPException(status_code=404, detail="No kept segments found")
     
     # ZIPファイル作成
-    export_dir = "data/export"
-    os.makedirs(export_dir, exist_ok=True)
-    
-    zip_path = os.path.join(export_dir, f"video_{video_id}_kept_segments.zip")
+    zip_path = os.path.join(EXPORT_DIR, f"video_{video_id}_kept_segments.zip")
     create_zip_archive(video_id, segments, zip_path)
     
     return FileResponse(
@@ -211,9 +216,9 @@ async def export_zip(
         filename=f"video_{video_id}_kept_segments.zip"
     )
 
-@app.get("/file")
+@app.get("/api/file")
 async def serve_file(path: str = Query(...)):
-    """ローカルファイル配信（開発用途限定）"""
+    """ローカルファイル配信"""
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
     
