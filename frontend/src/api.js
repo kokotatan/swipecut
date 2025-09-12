@@ -1,4 +1,4 @@
-const API_BASE = '/api';
+const API_BASE = process.env.NODE_ENV === 'production' ? '/api' : '/api';
 
 export const uploadVideo = async (file, chunkSec = 60) => {
   const formData = new FormData();

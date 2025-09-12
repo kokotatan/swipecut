@@ -87,6 +87,37 @@ swipecut/
 └── README.md
 ```
 
+## デプロイ（Vercel）
+
+### 1. Vercel CLIのインストール
+```bash
+npm i -g vercel
+```
+
+### 2. デプロイ
+```bash
+# プロジェクトルートで実行
+vercel
+
+# 本番デプロイ
+vercel --prod
+```
+
+### 3. 環境変数設定
+Vercelダッシュボードで以下の環境変数を設定：
+- `PYTHONPATH`: `/var/task/backend`
+- `NODE_ENV`: `production`
+
+### 4. 制限事項
+- **ファイル保存**: 一時ディレクトリに保存（再起動で削除）
+- **データベース**: SQLite（永続化されない）
+- **FFmpeg**: Vercel Functionsでは利用不可
+
+### 本格運用の場合
+- **AWS**: EC2 + S3 + RDS
+- **Google Cloud**: Cloud Run + Cloud Storage + Cloud SQL
+- **Railway**: 簡単デプロイ、FFmpeg対応
+
 ## ライセンス
 
 MIT License
