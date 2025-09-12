@@ -1,130 +1,92 @@
 # SwipeCut
 
-動画を自動分割し、Tinder風UIで"残す/捨てる"を選択できるWebアプリケーションです。
+動画を自動分割し、Tinder風UIで「残す/捨てる」を高速判定。各クリップに名前を付けて保存し、KeepのみをZIPで一括ダウンロードできます。（自動連結は実装しません）
 
-## 概要
+## 前提
 
-SwipeCutは、長い動画を1分ごとに自動分割し、Tinder風のスワイプUIで直感的に動画セグメントを選別できるツールです。左右キーまたはボタンでKeep/Drop判定を行い、結果をJSON形式でエクスポートできます。
+- macOS（例）
+- ffmpeg/ffprobe インストール済み： `brew install ffmpeg`
 
-## 技術スタック
-
-- **バックエンド**: FastAPI + FFmpeg（動画分割）
-- **フロントエンド**: React + Vite（UI/スワイプ選別）
-- **データベース**: SQLite（Video/Segment管理）
-- **開発環境**: Python 3.8+, Node.js 16+
-
-## 機能
-
-- 動画アップロード
-- 1分ごとの自動分割
-- Tinder風スワイプUI
-- キーボード操作対応（左右キー）
-- Keep/Drop判定
-- 結果のJSONエクスポート
-
-## セットアップ
-
-### 前提条件
-
-- Python 3.8以上
-- Node.js 16以上
-- FFmpeg（動画処理用）
-
-### インストール
-
-1. リポジトリをクローン
-```bash
-git clone https://github.com/your-username/swipecut.git
-cd swipecut
-```
-
-2. バックエンドのセットアップ
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-3. フロントエンドのセットアップ
-```bash
-cd ../frontend
-npm install
-```
-
-## 起動方法
+## 起動
 
 ### Backend
 
 ```bash
 cd backend
+python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
-
-バックエンドAPIは `http://localhost:8000` で起動します。
 
 ### Frontend
 
 ```bash
 cd frontend
+npm install
 npm run dev
 ```
-
-フロントエンドアプリは `http://localhost:5173` で起動します。
 
 ## 使用方法
 
 1. ブラウザで `http://localhost:5173` にアクセス
-2. 動画ファイルをアップロード
-3. 自動分割されたセグメントをTinder風UIで確認
+2. 動画ファイルをアップロード（1分ごとに自動分割）
+3. セグメントをTinder風UIで確認
 4. 左右キーまたはボタンでKeep/Drop判定
-5. 結果をJSON形式でエクスポート
+5. Keepする場合はセグメント名を入力
+6. 全件判定後、JSONエクスポートまたはZIPダウンロード
+
+## 機能
+
+- **動画分割**: FFmpegを使用して1分ごとに自動分割
+- **Tinder風UI**: 直感的なスワイプ操作
+- **キーボード操作**: 左右矢印キーで判定
+- **セグメント命名**: Keepするセグメントに名前を付与
+- **進捗表示**: リアルタイムで判定状況を表示
+- **エクスポート**: JSON形式でのメタデータ出力
+- **ZIPダウンロード**: Keepしたセグメントのみを一括ダウンロード
+
+## 技術スタック
+
+- **バックエンド**: FastAPI + FFmpeg + SQLite
+- **フロントエンド**: React + Vite
+- **データベース**: SQLAlchemy + SQLite
 
 ## API仕様
 
 ### エンドポイント
 
-- `POST /upload` - 動画アップロード
-- `GET /videos` - 動画一覧取得
-- `GET /segments/{video_id}` - セグメント一覧取得
-- `POST /segments/{segment_id}/judge` - セグメント判定
-- `GET /export/{video_id}` - 結果エクスポート
+- `POST /upload?chunk_sec=60` - 動画アップロード＆分割
+- `GET /next_segment?video_id` - 次の未判定セグメント取得
+- `POST /decide?segment_id=&decision=keep|drop` - 判定保存
+- `GET /progress?video_id` - 進捗状況取得
+- `POST /name?segment_id=&name=` - セグメント命名
+- `GET /export?video_id` - KeepメタデータJSON出力
+- `GET /export_zip?video_id` - KeepセグメントZIP出力
+- `GET /file?path` - ローカルファイル配信
 
-## 開発
-
-### プロジェクト構造
+## プロジェクト構造
 
 ```
 swipecut/
 ├── backend/          # FastAPI バックエンド
-│   ├── app/
+│   ├── main.py       # メインAPI
+│   ├── db.py         # データベース設定
+│   ├── models.py     # SQLAlchemyモデル
+│   ├── video.py      # FFmpeg処理
 │   ├── requirements.txt
-│   └── main.py
+│   └── data/         # 動画・セグメント保存先
 ├── frontend/         # React フロントエンド
 │   ├── src/
+│   │   ├── App.jsx   # メインコンポーネント
+│   │   ├── api.js    # API関数
+│   │   └── styles.css
 │   ├── package.json
 │   └── vite.config.js
 ├── .gitignore
 └── README.md
 ```
 
-### コントリビューション
-
-1. フォークを作成
-2. フィーチャーブランチを作成 (`git checkout -b feature/amazing-feature`)
-3. 変更をコミット (`git commit -m 'Add some amazing feature'`)
-4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
-5. プルリクエストを作成
-
 ## ライセンス
 
-このプロジェクトはMITライセンスの下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
-
-## 作者
-
-- [Your Name](https://github.com/your-username)
-
-## サポート
-
-問題や質問がある場合は、[Issues](https://github.com/your-username/swipecut/issues) で報告してください。
+MIT License

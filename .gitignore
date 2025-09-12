@@ -192,6 +192,9 @@ public
 .out
 .storybook-out
 
+# Vite
+.vite/
+
 # Temporary folders
 tmp/
 temp/
@@ -224,3 +227,6 @@ Thumbs.db
 # FFmpeg temporary files
 *.tmp
 *.temp
+
+# SwipeCut specific
+backend/data/
