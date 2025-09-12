@@ -64,14 +64,16 @@ async def health_check():
         "timestamp": __import__("datetime").datetime.now().isoformat()
     }
 
-# ルートエンドポイント（静的ファイル配信の前に定義）
-@app.get("/")
-async def root():
-    return {"message": "SwipeCut API is running", "status": "healthy"}
-
 # 静的ファイル配信（フロントエンド用）
 if os.path.exists("frontend/dist"):
+    print("📂 Mounting static files from frontend/dist")
     app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
+else:
+    print("❌ Frontend dist directory not found")
+    # フロントエンドがない場合のフォールバック
+    @app.get("/")
+    async def root():
+        return {"message": "SwipeCut API is running", "status": "healthy", "frontend": "not found"}
 
 @app.post("/api/upload")
 async def upload_video(
