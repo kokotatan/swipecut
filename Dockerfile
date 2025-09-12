@@ -36,4 +36,4 @@ RUN pip install aiofiles
 EXPOSE 8000
 
 # 起動コマンド
-CMD ["sh", "-c", "python3 -m uvicorn main:app --host 0.0.0.0 --port $PORT"]
+CMD ["sh", "-c", "echo 'Starting SwipeCut API...' && python3 -m uvicorn main:app --host 0.0.0.0 --port $PORT"]

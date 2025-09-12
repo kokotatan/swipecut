@@ -12,5 +12,9 @@
   },
   "domains": [
     "swipecut.kotaro-design-lab.com"
-  ]
+  ],
+  "healthcheck": {
+    "path": "/health",
+    "timeout": 300
+  }
 }

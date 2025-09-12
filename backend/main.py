@@ -33,6 +33,14 @@ app.add_middleware(
 # データベーステーブル作成
 create_tables()
 
+# アプリケーション起動ログ
+print("🚀 SwipeCut API starting...")
+print(f"📁 Working directory: {os.getcwd()}")
+print(f"🌐 Port: {os.getenv('PORT', '8000')}")
+print(f"📂 Frontend dist exists: {os.path.exists('frontend/dist')}")
+print("✅ Database tables created")
+print("✅ Application ready!")
+
 # 環境に応じたディレクトリ設定
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "data/original")
 SEGMENTS_DIR = os.getenv("SEGMENTS_DIR", "data/segments")
@@ -47,11 +55,13 @@ os.makedirs(EXPORT_DIR, exist_ok=True)
 @app.get("/health")
 async def health_check():
     import os
+    print(f"Health check called - Port: {os.getenv('PORT', '8000')}")
     return {
         "message": "SwipeCut API is running", 
         "status": "healthy",
         "port": os.getenv("PORT", "8000"),
-        "frontend_exists": os.path.exists("frontend/dist")
+        "frontend_exists": os.path.exists("frontend/dist"),
+        "timestamp": __import__("datetime").datetime.now().isoformat()
     }
 
 # ルートエンドポイント（静的ファイル配信の前に定義）
