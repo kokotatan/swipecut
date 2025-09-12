@@ -47,6 +47,11 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(SEGMENTS_DIR, exist_ok=True)
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
+# ヘルスチェック用のルートエンドポイント
+@app.get("/")
+async def root():
+    return {"message": "SwipeCut API is running", "status": "healthy"}
+
 @app.post("/api/upload")
 async def upload_video(
     file: UploadFile = File(...),
