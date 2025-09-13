@@ -13,6 +13,7 @@ from pathlib import Path
 from db import get_db, create_tables
 from models import Video, Segment
 from video import split_video, create_zip_archive
+from google_photos import google_photos_client
 
 app = FastAPI(title="SwipeCut API", version="1.0.0")
 
@@ -363,6 +364,100 @@ async def serve_file(path: str = Query(...)):
         raise HTTPException(status_code=404, detail="File not found")
     
     return FileResponse(path)
+
+# Google Photos連携エンドポイント
+@app.get("/api/google-photos/auth-url")
+async def get_google_photos_auth_url():
+    """Google Photos認証URLを取得"""
+    try:
+        auth_url = google_photos_client.get_authorization_url()
+        return {"auth_url": auth_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get auth URL: {str(e)}")
+
+@app.get("/api/google-photos/callback")
+async def google_photos_callback(code: str = Query(...)):
+    """Google Photos認証コールバック"""
+    try:
+        success = google_photos_client.authenticate_with_code(code)
+        if success:
+            return {"status": "success", "message": "Google Photos認証が完了しました"}
+        else:
+            raise HTTPException(status_code=400, detail="Authentication failed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
+
+@app.get("/api/google-photos/videos")
+async def get_google_photos_videos(page_size: int = Query(25, ge=1, le=100)):
+    """Google Photosの動画リストを取得"""
+    try:
+        videos = google_photos_client.get_video_list(page_size)
+        return {"videos": videos}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get videos: {str(e)}")
+
+@app.post("/api/google-photos/download")
+async def download_google_photos_video(
+    media_item_id: str = Query(...),
+    chunk_sec: int = Query(60, description="分割秒数"),
+    db: Session = Depends(get_db)
+):
+    """Google Photosから動画をダウンロードして分割"""
+    try:
+        print(f"📤 Google Photos download started: {media_item_id}, chunk_sec: {chunk_sec}")
+        
+        # 動画のメタデータを取得
+        metadata = google_photos_client.get_video_metadata(media_item_id)
+        filename = metadata['filename']
+        
+        # 動画をダウンロード
+        file_path = google_photos_client.download_video(media_item_id, filename, UPLOAD_DIR)
+        print(f"✅ Video downloaded: {file_path}")
+        
+        # データベースに記録
+        video = Video(
+            filename=filename, 
+            original_path=file_path,
+            source="google_photos",
+            source_id=media_item_id
+        )
+        db.add(video)
+        db.commit()
+        db.refresh(video)
+        print(f"💾 Video record created: ID {video.id}")
+        
+        # 動画分割
+        print("🎬 Starting video segmentation...")
+        segments_data = split_video(file_path, SEGMENTS_DIR, chunk_sec)
+        print(f"✅ Video segmented into {len(segments_data)} segments")
+        
+        # セグメントをデータベースに記録
+        for i, (start_sec, end_sec, segment_path) in enumerate(segments_data):
+            segment = Segment(
+                video_id=video.id,
+                index=i,
+                path=segment_path,
+                start_sec=start_sec,
+                end_sec=end_sec,
+                decision="pending"
+            )
+            db.add(segment)
+        
+        db.commit()
+        print("✅ All segments saved to database")
+        
+        return {
+            "video_id": video.id, 
+            "segments_count": len(segments_data),
+            "filename": filename,
+            "metadata": metadata
+        }
+    
+    except Exception as e:
+        print(f"❌ Google Photos download error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

@@ -87,3 +87,36 @@ export const downloadZip = async (videoId) => {
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
 };
+
+// Google Photos API functions
+export const getGooglePhotosAuthUrl = async () => {
+  const response = await fetch(`${API_BASE}/google-photos/auth-url`);
+  
+  if (!response.ok) {
+    throw new Error('Failed to get auth URL');
+  }
+  
+  return response.json();
+};
+
+export const getGooglePhotosVideos = async (pageSize = 25) => {
+  const response = await fetch(`${API_BASE}/google-photos/videos?page_size=${pageSize}`);
+  
+  if (!response.ok) {
+    throw new Error('Failed to get videos');
+  }
+  
+  return response.json();
+};
+
+export const downloadGooglePhotosVideo = async (mediaItemId, chunkSec = 60) => {
+  const response = await fetch(`${API_BASE}/google-photos/download?media_item_id=${mediaItemId}&chunk_sec=${chunkSec}`, {
+    method: 'POST',
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to download video');
+  }
+  
+  return response.json();
+};

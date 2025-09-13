@@ -11,6 +11,8 @@ class Video(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, nullable=False)
     original_path = Column(String, nullable=False)
+    source = Column(String, default="upload")  # upload, google_photos
+    source_id = Column(String, nullable=True)  # Google Photos media item ID
     created_at = Column(DateTime, default=datetime.utcnow)
     
     segments = relationship("Segment", back_populates="video")

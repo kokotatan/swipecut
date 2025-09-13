@@ -29,6 +29,7 @@ npm run dev
 
 ## 使用方法
 
+### 通常の動画アップロード
 1. ブラウザで `http://localhost:5173` にアクセス
 2. 動画ファイルをアップロード（1分ごとに自動分割）
 3. セグメントをTinder風UIで確認
@@ -36,9 +37,17 @@ npm run dev
 5. Keepする場合はセグメント名を入力
 6. 全件判定後、JSONエクスポートまたはZIPダウンロード
 
+### Google Photos連携
+1. 「Google Photosに接続」ボタンをクリック
+2. Googleアカウントで認証
+3. 「動画一覧を表示」でGoogle Photosの動画を確認
+4. 分割したい動画の「分割開始」ボタンをクリック
+5. 通常の分割・判定フローに進む
+
 ## 機能
 
 - **動画分割**: FFmpegを使用して1分ごとに自動分割
+- **Google Photos連携**: Google Photosに保存された動画を直接分割
 - **Tinder風UI**: 直感的なスワイプ操作
 - **キーボード操作**: 左右矢印キーで判定
 - **セグメント命名**: Keepするセグメントに名前を付与
@@ -64,6 +73,13 @@ npm run dev
 - `GET /api/export?video_id` - KeepメタデータJSON出力
 - `GET /api/export_zip?video_id` - KeepセグメントZIP出力
 - `GET /api/file?path` - ローカルファイル配信
+
+### Google Photos連携エンドポイント
+
+- `GET /api/google-photos/auth-url` - Google Photos認証URL取得
+- `GET /api/google-photos/callback?code=` - 認証コールバック
+- `GET /api/google-photos/videos?page_size=25` - Google Photos動画一覧取得
+- `POST /api/google-photos/download?media_item_id=&chunk_sec=60` - Google Photos動画ダウンロード＆分割
 
 ## プロジェクト構造
 
@@ -111,12 +127,25 @@ railway init
 railway up
 ```
 
-### 5. 環境変数設定（オプション）
+### 5. 環境変数設定
 ```bash
+# 基本設定
 railway variables set UPLOAD_DIR=/tmp/swipecut/original
 railway variables set SEGMENTS_DIR=/tmp/swipecut/segments
 railway variables set EXPORT_DIR=/tmp/swipecut/export
+
+# Google Photos API設定（Google Photos連携を使用する場合）
+railway variables set GOOGLE_PHOTOS_CLIENT_ID=your_google_photos_client_id
+railway variables set GOOGLE_PHOTOS_CLIENT_SECRET=your_google_photos_client_secret
 ```
+
+### Google Photos API設定方法
+
+1. [Google Cloud Console](https://console.cloud.google.com/)でプロジェクトを作成
+2. Google Photos Library APIを有効化
+3. OAuth 2.0クライアントIDを作成
+4. 承認済みリダイレクトURIに `https://your-domain.com/api/google-photos/callback` を追加
+5. クライアントIDとクライアントシークレットを環境変数に設定
 
 ### 6. カスタムドメイン設定
 ```bash
