@@ -1,0 +1,12 @@
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+startCommand = "python3 start.py"
+
+[[services]]
+name = "swipecut"
+
+[services.volumes]
+source = "data"
+target = "/app/data"

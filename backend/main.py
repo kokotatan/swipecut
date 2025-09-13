@@ -43,9 +43,10 @@ print("✅ Database tables created")
 print("✅ Application ready!")
 
 # 環境に応じたディレクトリ設定
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "data/original")
-SEGMENTS_DIR = os.getenv("SEGMENTS_DIR", "data/segments")
-EXPORT_DIR = os.getenv("EXPORT_DIR", "data/export")
+# Railway Volumeを使用する場合は /app/data を使用
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/data/original")
+SEGMENTS_DIR = os.getenv("SEGMENTS_DIR", "/app/data/segments")
+EXPORT_DIR = os.getenv("EXPORT_DIR", "/app/data/export")
 
 # ディレクトリ作成
 os.makedirs(UPLOAD_DIR, exist_ok=True)
