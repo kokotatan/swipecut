@@ -110,6 +110,25 @@ async def debug_files():
         "logo_exists": os.path.exists("frontend/dist/swipeout_logo.jpg")
     }
 
+# デバッグ用：APIエンドポイント一覧
+@app.get("/debug/endpoints")
+async def debug_endpoints():
+    return {
+        "endpoints": [
+            {"path": "/health", "method": "GET"},
+            {"path": "/api/upload", "method": "POST"},
+            {"path": "/api/next_segment", "method": "GET"},
+            {"path": "/api/decide", "method": "POST"},
+            {"path": "/api/name", "method": "POST"},
+            {"path": "/api/progress", "method": "GET"},
+            {"path": "/api/export", "method": "GET"},
+            {"path": "/api/export_zip", "method": "GET"},
+        ],
+        "cors_origins": ALLOWED_ORIGINS,
+        "upload_dir": UPLOAD_DIR,
+        "segments_dir": SEGMENTS_DIR
+    }
+
 # 静的ファイル配信（フロントエンド用）
 if os.path.exists("frontend/dist"):
     print("📂 Mounting static files from frontend/dist")

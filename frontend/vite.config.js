@@ -19,6 +19,5 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     minify: 'terser'
-  },
-  base: '/static/'
+  }
 })
