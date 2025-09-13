@@ -191,7 +191,6 @@ function App() {
     <div className="container">
       <div className="header">
         <div className="logo-container">
-          <img src="/swipeout_logo.jpg" alt="SwipeCut Logo" className="logo" />
           <h1>SwipeCut</h1>
         </div>
         <p>動画を自動分割し、Tinder風UIで「残す/捨てる」を高速判定</p>
