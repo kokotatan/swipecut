@@ -45,9 +45,9 @@ print("✅ Application ready!")
 
 # 一時ストレージ設定（本格運用でも十分）
 # 動画処理後はZIPファイルでダウンロードするため永続化不要
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/data/original")
-SEGMENTS_DIR = os.getenv("SEGMENTS_DIR", "/tmp/data/segments")
-EXPORT_DIR = os.getenv("EXPORT_DIR", "/tmp/data/export")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "data/original")
+SEGMENTS_DIR = os.getenv("SEGMENTS_DIR", "data/segments")
+EXPORT_DIR = os.getenv("EXPORT_DIR", "data/export")
 
 # ディレクトリ作成
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -143,15 +143,31 @@ async def upload_video(
         print(f"📁 Upload directory: {UPLOAD_DIR}")
         print(f"📁 Segments directory: {SEGMENTS_DIR}")
         
+        # ディレクトリの存在確認と作成
+        if not os.path.exists(UPLOAD_DIR):
+            print(f"📁 Creating upload directory: {UPLOAD_DIR}")
+            os.makedirs(UPLOAD_DIR, exist_ok=True)
+        
+        if not os.path.exists(SEGMENTS_DIR):
+            print(f"📁 Creating segments directory: {SEGMENTS_DIR}")
+            os.makedirs(SEGMENTS_DIR, exist_ok=True)
+        
         # ファイル保存
         file_path = os.path.join(UPLOAD_DIR, file.filename)
         print(f"💾 Saving file to: {file_path}")
         
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-        
-        print(f"✅ File saved successfully, size: {len(content)} bytes")
+        # 書き込み権限の確認
+        try:
+            with open(file_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+            print(f"✅ File saved successfully, size: {len(content)} bytes")
+        except PermissionError as e:
+            print(f"❌ Permission error: {e}")
+            raise HTTPException(status_code=500, detail=f"Permission denied: {str(e)}")
+        except Exception as e:
+            print(f"❌ File save error: {e}")
+            raise HTTPException(status_code=500, detail=f"File save failed: {str(e)}")
         
         # データベースに記録
         video = Video(filename=file.filename, original_path=file_path)
