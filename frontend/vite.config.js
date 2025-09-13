@@ -19,5 +19,6 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     minify: 'terser'
-  }
+  },
+  base: process.env.NODE_ENV === 'production' ? '/static/' : '/'
 })
