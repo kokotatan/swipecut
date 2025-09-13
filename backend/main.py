@@ -18,7 +18,7 @@ app = FastAPI(title="SwipeCut API", version="1.0.0")
 
 # CORS設定（本番環境用）
 ALLOWED_ORIGINS = [
-    "https://swipecut.kotaro-design-lab.com",
+    "https://swipecut.kotaro-design-lab.com",  # カスタムドメイン
     "https://swipecut-production.up.railway.app",  # Railwayデフォルトドメイン
     "http://localhost:5173",  # 開発環境用
     "http://localhost:3000",  # 開発環境用
