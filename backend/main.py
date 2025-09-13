@@ -110,20 +110,31 @@ async def upload_video(
 ):
     """動画アップロード＆分割"""
     try:
+        print(f"📤 Upload started: {file.filename}, chunk_sec: {chunk_sec}")
+        print(f"📁 Upload directory: {UPLOAD_DIR}")
+        print(f"📁 Segments directory: {SEGMENTS_DIR}")
+        
         # ファイル保存
         file_path = os.path.join(UPLOAD_DIR, file.filename)
+        print(f"💾 Saving file to: {file_path}")
+        
         with open(file_path, "wb") as buffer:
             content = await file.read()
             buffer.write(content)
+        
+        print(f"✅ File saved successfully, size: {len(content)} bytes")
         
         # データベースに記録
         video = Video(filename=file.filename, original_path=file_path)
         db.add(video)
         db.commit()
         db.refresh(video)
+        print(f"💾 Video record created: ID {video.id}")
         
         # 動画分割
+        print("🎬 Starting video segmentation...")
         segments_data = split_video(file_path, SEGMENTS_DIR, chunk_sec)
+        print(f"✅ Video segmented into {len(segments_data)} segments")
         
         # セグメントをデータベースに記録
         for i, (start_sec, end_sec, segment_path) in enumerate(segments_data):
@@ -138,11 +149,15 @@ async def upload_video(
             db.add(segment)
         
         db.commit()
+        print("✅ All segments saved to database")
         
         return {"video_id": video.id, "segments_count": len(segments_data)}
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Upload error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.get("/api/next_segment")
 async def get_next_segment(
