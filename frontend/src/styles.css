@@ -51,22 +51,81 @@ body {
   opacity: 0.9;
 }
 
+/* 進捗表示 */
+.progress-container {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 20px;
+  background-color: #f0f0f0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  transition: width 0.3s ease;
+  border-radius: 10px;
+}
+
+.progress-text {
+  margin: 5px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.estimated-time {
+  color: #888;
+  font-size: 12px;
+}
+
+.warning-text {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 5px;
+  color: #856404;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
   .logo-container {
     flex-direction: column;
     gap: 15px;
   }
-  
+
   .logo {
     width: 60px;
     height: 60px;
   }
-  
+
   .header h1 {
     font-size: 2.5rem;
   }
-  
+
   .header p {
     font-size: 1rem;
   }

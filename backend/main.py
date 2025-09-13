@@ -122,8 +122,18 @@ if os.path.exists("frontend/dist"):
     # 静的ファイルを /static パスで配信（APIルートより後にマウント）
     app.mount("/static", StaticFiles(directory="frontend/dist"), name="static")
     
+    # ロゴファイル専用のエンドポイント（フォールバック）
+    @app.get("/swipeout_logo.jpg")
+    async def serve_logo():
+        logo_path = "frontend/dist/swipeout_logo.jpg"
+        if os.path.exists(logo_path):
+            return FileResponse(logo_path, media_type="image/jpeg")
+        else:
+            raise HTTPException(status_code=404, detail="Logo not found")
+    
     print("✅ Static files mounted at /static")
     print("✅ Frontend served at /")
+    print("✅ Logo fallback endpoint created")
 else:
     print("❌ Frontend dist directory not found")
     # フロントエンドがない場合のフォールバック

@@ -17,6 +17,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [estimatedTime, setEstimatedTime] = useState(null);
 
   // キーボードイベントハンドラー
   const handleKeyPress = useCallback((event) => {
@@ -43,9 +45,36 @@ function App() {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setUploadProgress(0);
+    setEstimatedTime(null);
+    
+    // ファイルサイズから処理時間を推定
+    const fileSizeMB = file.size / (1024 * 1024);
+    const estimatedSeconds = Math.max(10, Math.ceil(fileSizeMB * 2)); // 1MBあたり2秒程度
+    setEstimatedTime(estimatedSeconds);
+    
+    // タブ切り替え防止のイベントリスナー
+    const beforeUnloadHandler = (e) => {
+      e.preventDefault();
+      e.returnValue = 'アップロード中です。タブを切り替えずにお待ちください。';
+      return 'アップロード中です。タブを切り替えずにお待ちください。';
+    };
+    window.addEventListener('beforeunload', beforeUnloadHandler);
 
     try {
+      // 進捗シミュレーション
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) return prev;
+          return prev + Math.random() * 10;
+        });
+      }, 1000);
+      
       const result = await uploadVideo(file, 60);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
       setCurrentVideo({ id: result.video_id, filename: file.name });
       setSuccess(`動画をアップロードしました。${result.segments_count}個のセグメントに分割されました。`);
       
@@ -55,6 +84,9 @@ function App() {
       setError('アップロードに失敗しました: ' + err.message);
     } finally {
       setLoading(false);
+      setUploadProgress(0);
+      setEstimatedTime(null);
+      window.removeEventListener('beforeunload', beforeUnloadHandler);
     }
   };
 
@@ -159,7 +191,7 @@ function App() {
     <div className="container">
       <div className="header">
         <div className="logo-container">
-          <img src="/static/swipeout_logo.jpg" alt="SwipeCut Logo" className="logo" />
+          <img src="/swipeout_logo.jpg" alt="SwipeCut Logo" className="logo" />
           <h1>SwipeCut</h1>
         </div>
         <p>動画を自動分割し、Tinder風UIで「残す/捨てる」を高速判定</p>
@@ -274,7 +306,33 @@ function App() {
         </>
       )}
 
-      {loading && <div className="loading">処理中...</div>}
+      {loading && (
+        <div className="loading">
+          <div className="spinner"></div>
+          <p>処理中...</p>
+          {uploadProgress > 0 && (
+            <div className="progress-container">
+              <div className="progress-bar">
+                <div 
+                  className="progress-fill" 
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+              <p className="progress-text">
+                {Math.round(uploadProgress)}% 完了
+                {estimatedTime && (
+                  <span className="estimated-time">
+                    （残り約{Math.max(0, Math.ceil(estimatedTime * (100 - uploadProgress) / 100))}秒）
+                  </span>
+                )}
+              </p>
+              <p className="warning-text">
+                ⚠️ アップロード中です。タブを切り替えずにお待ちください。
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
