@@ -68,7 +68,13 @@ async def health_check():
 # 静的ファイル配信（フロントエンド用）
 if os.path.exists("frontend/dist"):
     print("📂 Mounting static files from frontend/dist")
-    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
+    # 静的ファイルを /static パスで配信
+    app.mount("/static", StaticFiles(directory="frontend/dist"), name="static")
+    
+    # ルートパスでフロントエンドのindex.htmlを配信
+    @app.get("/")
+    async def serve_frontend():
+        return FileResponse("frontend/dist/index.html")
 else:
     print("❌ Frontend dist directory not found")
     # フロントエンドがない場合のフォールバック
