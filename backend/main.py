@@ -7,6 +7,7 @@ from typing import List, Optional
 import os
 import json
 import zipfile
+import time
 from pathlib import Path
 
 from db import get_db, create_tables
@@ -42,16 +43,34 @@ print(f"📂 Frontend dist exists: {os.path.exists('frontend/dist')}")
 print("✅ Database tables created")
 print("✅ Application ready!")
 
-# 環境に応じたディレクトリ設定
-# Railway Volumeを使用する場合は /app/data を使用
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/data/original")
-SEGMENTS_DIR = os.getenv("SEGMENTS_DIR", "/app/data/segments")
-EXPORT_DIR = os.getenv("EXPORT_DIR", "/app/data/export")
+# 一時ストレージ設定（本格運用でも十分）
+# 動画処理後はZIPファイルでダウンロードするため永続化不要
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/data/original")
+SEGMENTS_DIR = os.getenv("SEGMENTS_DIR", "/tmp/data/segments")
+EXPORT_DIR = os.getenv("EXPORT_DIR", "/tmp/data/export")
 
 # ディレクトリ作成
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(SEGMENTS_DIR, exist_ok=True)
 os.makedirs(EXPORT_DIR, exist_ok=True)
+
+def cleanup_old_files():
+    """古いファイルをクリーンアップ（24時間以上前）"""
+    current_time = time.time()
+    cutoff_time = current_time - (24 * 60 * 60)  # 24時間前
+    
+    for directory in [UPLOAD_DIR, SEGMENTS_DIR, EXPORT_DIR]:
+        if os.path.exists(directory):
+            for file_path in Path(directory).glob("*"):
+                if file_path.is_file() and file_path.stat().st_mtime < cutoff_time:
+                    try:
+                        file_path.unlink()
+                        print(f"🗑️ Cleaned up old file: {file_path}")
+                    except Exception as e:
+                        print(f"⚠️ Failed to clean up {file_path}: {e}")
+
+# 起動時にクリーンアップ実行
+cleanup_old_files()
 
 # ヘルスチェック用のエンドポイント
 @app.get("/health")
