@@ -82,19 +82,48 @@ async def health_check():
         "status": "healthy",
         "port": os.getenv("PORT", "8000"),
         "frontend_exists": os.path.exists("frontend/dist"),
+        "logo_exists": os.path.exists("frontend/dist/swipeout_logo.jpg"),
         "timestamp": __import__("datetime").datetime.now().isoformat()
+    }
+
+# デバッグ用：静的ファイル一覧
+@app.get("/debug/files")
+async def debug_files():
+    import os
+    from pathlib import Path
+    
+    if not os.path.exists("frontend/dist"):
+        return {"error": "frontend/dist not found"}
+    
+    files = []
+    for file_path in Path("frontend/dist").rglob("*"):
+        if file_path.is_file():
+            files.append({
+                "name": str(file_path.relative_to("frontend/dist")),
+                "size": file_path.stat().st_size,
+                "exists": file_path.exists()
+            })
+    
+    return {
+        "directory": "frontend/dist",
+        "files": files,
+        "logo_exists": os.path.exists("frontend/dist/swipeout_logo.jpg")
     }
 
 # 静的ファイル配信（フロントエンド用）
 if os.path.exists("frontend/dist"):
     print("📂 Mounting static files from frontend/dist")
-    # 静的ファイルを /static パスで配信
-    app.mount("/static", StaticFiles(directory="frontend/dist"), name="static")
     
     # ルートパスでフロントエンドのindex.htmlを配信
     @app.get("/")
     async def serve_frontend():
         return FileResponse("frontend/dist/index.html")
+    
+    # 静的ファイルを /static パスで配信（APIルートより後にマウント）
+    app.mount("/static", StaticFiles(directory="frontend/dist"), name="static")
+    
+    print("✅ Static files mounted at /static")
+    print("✅ Frontend served at /")
 else:
     print("❌ Frontend dist directory not found")
     # フロントエンドがない場合のフォールバック
