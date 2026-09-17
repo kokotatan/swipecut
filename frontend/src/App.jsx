@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   uploadVideo,
   nextSegment,
@@ -6,10 +6,7 @@ import {
   setName,
   progress,
   exportKept,
-  downloadZip,
-  getGooglePhotosAuthUrl,
-  getGooglePhotosVideos,
-  downloadGooglePhotosVideo
+  downloadZip
 } from './api';
 
 function App() {
@@ -22,9 +19,6 @@ function App() {
   const [success, setSuccess] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState(null);
-  const [googlePhotosVideos, setGooglePhotosVideos] = useState([]);
-  const [showGooglePhotos, setShowGooglePhotos] = useState(false);
-  const [isGooglePhotosAuthenticated, setIsGooglePhotosAuthenticated] = useState(false);
 
   // キーボードイベントハンドラー
   const handleKeyPress = useCallback((event) => {
@@ -47,6 +41,14 @@ function App() {
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      setError('動画ファイルを選択してください。');
+      return;
+    }
+    if (file.size > 95 * 1024 * 1024) {
+      setError('動画は95MB以下にしてください。');
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -191,52 +193,6 @@ function App() {
     }
   };
 
-  // Google Photos関連の関数
-  const handleGooglePhotosAuth = async () => {
-    try {
-      const { auth_url } = await getGooglePhotosAuthUrl();
-      window.open(auth_url, '_blank');
-      setIsGooglePhotosAuthenticated(true);
-    } catch (err) {
-      setError('Google Photos認証に失敗しました: ' + err.message);
-    }
-  };
-
-  const loadGooglePhotosVideos = async () => {
-    try {
-      const { videos } = await getGooglePhotosVideos();
-      setGooglePhotosVideos(videos);
-      setShowGooglePhotos(true);
-    } catch (err) {
-      setError('Google Photos動画の取得に失敗しました: ' + err.message);
-    }
-  };
-
-  const handleGooglePhotosVideoDownload = async (mediaItemId, filename) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    setUploadProgress(0);
-    setEstimatedTime(null);
-
-    try {
-      const result = await downloadGooglePhotosVideo(mediaItemId, 60);
-      
-      setCurrentVideo({ id: result.video_id, filename: result.filename });
-      setSuccess(`Google Photosから動画をダウンロードしました。${result.segments_count}個のセグメントに分割されました。`);
-      
-      // 最初のセグメントを取得
-      await loadNextSegment(result.video_id);
-      setShowGooglePhotos(false);
-    } catch (err) {
-      setError('Google Photos動画のダウンロードに失敗しました: ' + err.message);
-    } finally {
-      setLoading(false);
-      setUploadProgress(0);
-      setEstimatedTime(null);
-    }
-  };
-
   const isAllDone = progressData && progressData.pending === 0;
 
   return (
@@ -253,15 +209,13 @@ function App() {
 
       {!currentVideo ? (
         <div className="card">
-          {!showGooglePhotos ? (
-            <>
-              <div className="upload-area" onClick={() => document.getElementById('fileInput').click()}>
+              <label className="upload-area" htmlFor="fileInput">
                 <div className="upload-text">
                   動画ファイルを選択してアップロード
                 </div>
-                <button className="upload-button">
+                <span className="upload-button">
                   ファイルを選択
-                </button>
+                </span>
                 <input
                   id="fileInput"
                   type="file"
@@ -269,78 +223,8 @@ function App() {
                   onChange={handleFileUpload}
                   className="upload-input"
                 />
-              </div>
-              
-              <div className="divider">
-                <span>または</span>
-              </div>
-              
-              <div className="google-photos-section">
-                <h3>Google Photosから動画を選択</h3>
-                <p>Google Photosに保存されている動画を直接分割できます</p>
-                <div className="google-photos-buttons">
-                  <button 
-                    className="google-photos-auth-button"
-                    onClick={handleGooglePhotosAuth}
-                  >
-                    Google Photosに接続
-                  </button>
-                  {isGooglePhotosAuthenticated && (
-                    <button 
-                      className="google-photos-load-button"
-                      onClick={loadGooglePhotosVideos}
-                    >
-                      動画一覧を表示
-                    </button>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="google-photos-video-list">
-              <div className="google-photos-header">
-                <h3>Google Photos動画一覧</h3>
-                <button 
-                  className="back-button"
-                  onClick={() => setShowGooglePhotos(false)}
-                >
-                  ← 戻る
-                </button>
-              </div>
-              
-              <div className="video-grid">
-                {googlePhotosVideos.map((video) => (
-                  <div key={video.id} className="video-item">
-                    <div className="video-thumbnail">
-                      <img 
-                        src={video.baseUrl + '=w200-h200'} 
-                        alt={video.filename}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'block';
-                        }}
-                      />
-                      <div className="video-placeholder" style={{display: 'none'}}>
-                        📹
-                      </div>
-                    </div>
-                    <div className="video-info">
-                      <div className="video-filename">{video.filename}</div>
-                      <div className="video-date">
-                        {new Date(video.mediaMetadata.creationTime).toLocaleDateString('ja-JP')}
-                      </div>
-                    </div>
-                    <button 
-                      className="download-button"
-                      onClick={() => handleGooglePhotosVideoDownload(video.id, video.filename)}
-                    >
-                      分割開始
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+              </label>
+              <p className="upload-note">MP4などの動画ファイル・95MBまで</p>
         </div>
       ) : (
         <>
@@ -350,7 +234,7 @@ function App() {
               <video
                 className="video-player"
                 controls
-                src={`/api/file?path=${encodeURIComponent(currentSegment.path)}`}
+                src={currentSegment.url}
                 key={currentSegment.segment_id}
               />
               

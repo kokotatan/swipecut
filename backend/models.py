@@ -1,7 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-from datetime import datetime
+from sqlalchemy.orm import declarative_base, relationship
+from datetime import UTC, datetime
 
 Base = declarative_base()
 
@@ -13,7 +12,7 @@ class Video(Base):
     original_path = Column(String, nullable=False)
     source = Column(String, default="upload")  # upload, google_photos
     source_id = Column(String, nullable=True)  # Google Photos media item ID
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
     
     segments = relationship("Segment", back_populates="video")
 
@@ -28,6 +27,6 @@ class Segment(Base):
     end_sec = Column(Float, nullable=False)
     decision = Column(String, default="pending")  # pending, keep, drop
     name = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
     
     video = relationship("Video", back_populates="segments")

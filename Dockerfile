@@ -1,42 +1,30 @@
-# Railway用Dockerfile
-FROM python:3.9-slim
+FROM node:22-slim AS frontend-build
 
-# システムパッケージの更新とFFmpegのインストール
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Node.jsをインストール
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
-
-# 作業ディレクトリの設定
-WORKDIR /app
-
-# フロントエンドをビルド
-COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend
-RUN npm install
-COPY frontend/ .
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
 RUN npm run build
 
-# バックエンドの依存関係をインストール
+FROM python:3.12-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
-COPY backend/requirements.txt .
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# アプリケーションコードをコピー
-COPY backend/ .
+COPY backend/ ./
+COPY start.py ./
+COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# 静的ファイルを配信するための設定
-RUN pip install aiofiles
+ENV PORT=8000 \
+    UPLOAD_DIR=/tmp/swipecut/original \
+    SEGMENTS_DIR=/tmp/swipecut/segments \
+    EXPORT_DIR=/tmp/swipecut/export \
+    DATABASE_URL=sqlite:////tmp/swipecut/swipecut.db
 
-# 起動スクリプトをコピー
-COPY start.py .
-
-# ポート設定
 EXPOSE 8000
-
-# 起動コマンド
-CMD ["python3", "start.py"]
+CMD ["python", "start.py"]

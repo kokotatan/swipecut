@@ -18,7 +18,7 @@ def main():
     
     # uvicornを起動
     cmd = [
-        'python3', '-m', 'uvicorn',
+        sys.executable, '-m', 'uvicorn',
         'main:app',
         '--host', '0.0.0.0',
         '--port', port
