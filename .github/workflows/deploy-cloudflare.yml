@@ -16,27 +16,17 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: |
-            backend/requirements.txt
-            backend/requirements-dev.txt
-      - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Install dependencies
         run: |
           npm ci
           npm ci --prefix frontend
-          python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
       - name: Test
         run: npm test
       - name: Configure Wrangler authentication
         run: |
           mkdir -p "$HOME/.config/.wrangler/config"
           printf '%s' "${{ secrets.WRANGLER_OAUTH_CONFIG_B64 }}" | base64 --decode > "$HOME/.config/.wrangler/config/default.toml"
-      - name: Deploy Worker and Container
+      - name: Deploy to Cloudflare Workers
         run: npx wrangler deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: a665c850fdb73311da8da1f1df6be202

@@ -3,20 +3,14 @@
   "version": "1.0.0",
   "description": "SwipeCut - Video splitting and Tinder-style UI for video editing",
   "scripts": {
-    "dev": "concurrently \"cd backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000\" \"cd frontend && npm run dev\"",
+    "dev": "npm run dev --prefix frontend",
     "build": "npm run build --prefix frontend",
-    "check": "wrangler types && tsc --noEmit && npm run lint --prefix frontend && npm run build",
-    "test": "python -m pytest backend/tests && npm run check",
+    "check": "npm run lint --prefix frontend && npm run build",
+    "test": "node --test frontend/tests/*.test.mjs && npm run check",
     "deploy": "npm test && wrangler deploy",
-    "start": "cd frontend && npm run preview",
-    "install:all": "cd frontend && npm install && cd ../backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
+    "start": "npm run preview --prefix frontend"
   },
   "devDependencies": {
-    "@cloudflare/containers": "^0.3.7",
-    "@cloudflare/workers-types": "^5.20260917.1",
-    "@types/node": "^24.10.1",
-    "concurrently": "^8.2.2",
-    "typescript": "^5.9.3",
     "wrangler": "^4.133.0"
   },
   "engines": {

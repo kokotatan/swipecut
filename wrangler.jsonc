@@ -1,31 +1,11 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "swipecut",
-  "main": "worker/index.ts",
   "compatibility_date": "2026-09-17",
-  "compatibility_flags": ["nodejs_compat"],
-  "containers": [
-    {
-      "class_name": "SwipeCutContainer",
-      "image": "./Dockerfile",
-      "max_instances": 5,
-      "instance_type": "basic"
-    }
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "SWIPECUT_CONTAINER",
-        "class_name": "SwipeCutContainer"
-      }
-    ]
+  "assets": {
+    "directory": "./frontend/dist",
+    "not_found_handling": "single-page-application"
   },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["SwipeCutContainer"]
-    }
-  ],
   "routes": [
     {
       "pattern": "swipecut.kotalabo.com",

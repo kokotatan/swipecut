@@ -1,45 +1,83 @@
-import { useState, useEffect, useCallback } from 'react';
-import {
-  uploadVideo,
-  nextSegment,
-  decide,
-  setName,
-  progress,
-  exportKept,
-  downloadZip
-} from './api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import JSZip from 'jszip';
+import { splitVideoLocally } from './video.js';
+import { sanitizeFileName } from './video-utils.js';
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 function App() {
-  const [currentVideo, setCurrentVideo] = useState(null);
-  const [currentSegment, setCurrentSegment] = useState(null);
-  const [progressData, setProgressData] = useState(null);
+  const [sourceName, setSourceName] = useState('');
+  const [segments, setSegments] = useState([]);
   const [segmentName, setSegmentName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [estimatedTime, setEstimatedTime] = useState(null);
 
-  // キーボードイベントハンドラー
-  const handleKeyPress = useCallback((event) => {
-    if (!currentSegment) return;
-    
-    if (event.key === 'ArrowLeft') {
-      handleDecision('drop');
-    } else if (event.key === 'ArrowRight') {
-      handleDecision('keep');
-    }
-  }, [currentSegment]);
+  const currentIndex = segments.findIndex((segment) => segment.decision === 'pending');
+  const currentSegment = currentIndex >= 0 ? segments[currentIndex] : null;
+  const progressData = useMemo(() => ({
+    kept: segments.filter((segment) => segment.decision === 'keep').length,
+    dropped: segments.filter((segment) => segment.decision === 'drop').length,
+    pending: segments.filter((segment) => segment.decision === 'pending').length,
+  }), [segments]);
+  const isAllDone = segments.length > 0 && progressData.pending === 0;
 
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyPress);
-    return () => {
-      document.removeEventListener('keydown', handleKeyPress);
+    setSegmentName(currentSegment?.name || '');
+  }, [currentSegment?.id, currentSegment?.name]);
+
+  useEffect(() => {
+    if (!loading) return undefined;
+    const warnBeforeLeaving = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
     };
-  }, [handleKeyPress]);
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [loading]);
+
+  const handleDecision = useCallback((decision) => {
+    if (!currentSegment || loading) return;
+    setSegments((items) => items.map((segment) => (
+      segment.id === currentSegment.id
+        ? { ...segment, decision, name: decision === 'keep' ? segmentName.trim() : '' }
+        : segment
+    )));
+    setSuccess(decision === 'keep' ? 'この場面を残しました。' : 'この場面を外しました。');
+  }, [currentSegment, loading, segmentName]);
+
+  useEffect(() => {
+    const handleKey = (event) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.key === 'ArrowLeft') handleDecision('drop');
+      if (event.key === 'ArrowRight') handleDecision('keep');
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [handleDecision]);
+
+  const reset = () => {
+    segments.forEach((segment) => URL.revokeObjectURL(segment.url));
+    setSegments([]);
+    setSourceName('');
+    setError(null);
+    setSuccess(null);
+    setProcessingProgress(0);
+  };
 
   const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+    const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('video/')) {
       setError('動画ファイルを選択してください。');
@@ -50,298 +88,149 @@ function App() {
       return;
     }
 
+    reset();
     setLoading(true);
-    setError(null);
-    setSuccess(null);
-    setUploadProgress(0);
-    setEstimatedTime(null);
-    
-    // ファイルサイズから処理時間を推定
-    const fileSizeMB = file.size / (1024 * 1024);
-    const estimatedSeconds = Math.max(10, Math.ceil(fileSizeMB * 2)); // 1MBあたり2秒程度
-    setEstimatedTime(estimatedSeconds);
-    
-    // タブ切り替え防止のイベントリスナー
-    const beforeUnloadHandler = (e) => {
-      e.preventDefault();
-      e.returnValue = 'アップロード中です。タブを切り替えずにお待ちください。';
-      return 'アップロード中です。タブを切り替えずにお待ちください。';
+    setSourceName(file.name);
+    try {
+      const nextSegments = await splitVideoLocally(file, 60, setProcessingProgress);
+      if (!nextSegments.length) throw new Error('分割できる場面がありませんでした。');
+      setSegments(nextSegments);
+      setSuccess(`${nextSegments.length}個の場面に分割しました。動画は端末の外へ送信されていません。`);
+    } catch (reason) {
+      setSourceName('');
+      setError(reason instanceof Error ? reason.message : '動画の分割に失敗しました。');
+    } finally {
+      setLoading(false);
+      setProcessingProgress(0);
+    }
+  };
+
+  const handleExport = () => {
+    const manifest = {
+      source: sourceName,
+      exported_at: new Date().toISOString(),
+      kept_segments: segments.filter((segment) => segment.decision === 'keep').map((segment) => ({
+        index: segment.index,
+        name: segment.name || `segment_${String(segment.index + 1).padStart(3, '0')}`,
+        start_sec: segment.start,
+        end_sec: segment.end,
+      })),
     };
-    window.addEventListener('beforeunload', beforeUnloadHandler);
-
-    try {
-      // 進捗シミュレーション
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) return prev;
-          return prev + Math.random() * 10;
-        });
-      }, 1000);
-      
-      const result = await uploadVideo(file, 60);
-      
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      
-      setCurrentVideo({ id: result.video_id, filename: file.name });
-      setSuccess(`動画をアップロードしました。${result.segments_count}個のセグメントに分割されました。`);
-      
-      // 最初のセグメントを取得
-      await loadNextSegment(result.video_id);
-    } catch (err) {
-      setError('アップロードに失敗しました: ' + err.message);
-    } finally {
-      setLoading(false);
-      setUploadProgress(0);
-      setEstimatedTime(null);
-      window.removeEventListener('beforeunload', beforeUnloadHandler);
-    }
-  };
-
-  const loadNextSegment = async (videoId) => {
-    try {
-      const segment = await nextSegment(videoId);
-      if (segment.done) {
-        setCurrentSegment(null);
-        setSuccess('すべてのセグメントの判定が完了しました！');
-      } else {
-        setCurrentSegment(segment);
-        setSegmentName(segment.name || '');
-      }
-      await loadProgress(videoId);
-    } catch (err) {
-      setError('セグメントの読み込みに失敗しました: ' + err.message);
-    }
-  };
-
-  const loadProgress = async (videoId) => {
-    try {
-      const progressInfo = await progress(videoId);
-      setProgressData(progressInfo);
-    } catch (err) {
-      console.error('進捗の取得に失敗しました:', err);
-    }
-  };
-
-  const handleDecision = async (decision) => {
-    if (!currentSegment || !currentVideo) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // 判定を保存
-      await decide(currentSegment.segment_id, decision);
-      
-      // Keepの場合は名前も保存
-      if (decision === 'keep' && segmentName.trim()) {
-        await setName(currentSegment.segment_id, segmentName.trim());
-      }
-      
-      setSuccess(`セグメントを${decision === 'keep' ? '残す' : '捨てる'}に設定しました。`);
-      
-      // 次のセグメントを取得
-      await loadNextSegment(currentVideo.id);
-    } catch (err) {
-      setError('判定の保存に失敗しました: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleExport = async () => {
-    if (!currentVideo) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const manifest = await exportKept(currentVideo.id);
-      const dataStr = JSON.stringify(manifest, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `video_${currentVideo.id}_manifest.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      setSuccess('JSONファイルをエクスポートしました。');
-    } catch (err) {
-      setError('エクスポートに失敗しました: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
+    downloadBlob(new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }), 'swipecut-manifest.json');
+    setSuccess('選別結果をJSONで保存しました。');
   };
 
   const handleDownloadZip = async () => {
-    if (!currentVideo) return;
-
+    const kept = segments.filter((segment) => segment.decision === 'keep');
+    if (!kept.length) {
+      setError('残す場面がありません。');
+      return;
+    }
     setLoading(true);
     setError(null);
-
     try {
-      await downloadZip(currentVideo.id);
-      setSuccess('ZIPファイルをダウンロードしました。');
-    } catch (err) {
-      setError('ZIPダウンロードに失敗しました: ' + err.message);
+      const zip = new JSZip();
+      const usedNames = new Set();
+      kept.forEach((segment) => {
+        const base = sanitizeFileName(segment.name, `segment_${String(segment.index + 1).padStart(3, '0')}`);
+        let name = `${base}.mp4`;
+        let suffix = 2;
+        while (usedNames.has(name)) name = `${base}_${suffix++}.mp4`;
+        usedNames.add(name);
+        zip.file(name, segment.bytes);
+      });
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+      downloadBlob(blob, 'swipecut-kept-segments.zip');
+      setSuccess('残した場面をZIPで保存しました。');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'ZIPの作成に失敗しました。');
     } finally {
       setLoading(false);
     }
   };
 
-  const isAllDone = progressData && progressData.pending === 0;
-
   return (
-    <div className="container">
-      <div className="header">
-        <div className="logo-container">
-          <h1>SwipeCut</h1>
-        </div>
-        <p>なが〜い動画を、1分間隔に分割し、スワイプしながら整理できるサービス。</p>
-      </div>
+    <main className="container">
+      <header className="header">
+        <div className="logo-container"><h1>SwipeCut</h1></div>
+        <p>長い動画を1分ずつに分けて、残す場面だけを選ぶ。</p>
+      </header>
 
-      {error && <div className="error">{error}</div>}
-      {success && <div className="success">{success}</div>}
+      {error && <div className="error" role="alert">{error}</div>}
+      {success && <div className="success" role="status">{success}</div>}
 
-      {!currentVideo ? (
-        <div className="card">
-              <label className="upload-area" htmlFor="fileInput">
-                <div className="upload-text">
-                  動画ファイルを選択してアップロード
-                </div>
-                <span className="upload-button">
-                  ファイルを選択
-                </span>
-                <input
-                  id="fileInput"
-                  type="file"
-                  accept="video/*"
-                  onChange={handleFileUpload}
-                  className="upload-input"
-                />
-              </label>
-              <p className="upload-note">MP4などの動画ファイル・95MBまで</p>
-        </div>
-      ) : (
+      {!sourceName ? (
+        <section className="card">
+          <label className="upload-area" htmlFor="fileInput">
+            <span className="upload-text">動画ファイルを選択して分割</span>
+            <span className="upload-button">ファイルを選ぶ</span>
+            <input id="fileInput" type="file" accept="video/*" onChange={handleFileUpload} className="upload-input" />
+          </label>
+          <p className="upload-note">MP4など・95MBまで・動画はブラウザ内だけで処理します</p>
+        </section>
+      ) : currentSegment ? (
         <>
-          {currentSegment && !isAllDone ? (
-            <div className="card">
-              <h2>セグメント {currentSegment.index + 1}</h2>
-              <video
-                className="video-player"
-                controls
-                src={currentSegment.url}
-                key={currentSegment.segment_id}
-              />
-              
-              <input
-                type="text"
-                className="name-input"
-                placeholder="セグメント名（Keepする場合のみ）"
-                value={segmentName}
-                onChange={(e) => setSegmentName(e.target.value)}
-              />
-              
-              <div className="controls">
-                <button
-                  className="control-button drop-button"
-                  onClick={() => handleDecision('drop')}
-                  disabled={loading}
-                >
-                  ← 捨てる
-                </button>
-                <button
-                  className="control-button keep-button"
-                  onClick={() => handleDecision('keep')}
-                  disabled={loading}
-                >
-                  残す →
-                </button>
-              </div>
-              
-              <div className="keyboard-hint">
-                キーボード: ← 捨てる / → 残す
-              </div>
+          <section className="card">
+            <h2>場面 {currentSegment.index + 1} / {segments.length}</h2>
+            <video className="video-player" controls src={currentSegment.url} key={currentSegment.id} />
+            <input
+              type="text"
+              className="name-input"
+              placeholder="残す場合のファイル名（任意）"
+              value={segmentName}
+              maxLength={80}
+              onChange={(event) => setSegmentName(event.target.value)}
+            />
+            <div className="controls">
+              <button className="control-button drop-button" onClick={() => handleDecision('drop')} disabled={loading}>← 外す</button>
+              <button className="control-button keep-button" onClick={() => handleDecision('keep')} disabled={loading}>残す →</button>
             </div>
-          ) : isAllDone ? (
-            <div className="card">
-              <h2>判定完了！</h2>
-              <p>すべてのセグメントの判定が完了しました。</p>
-              <div className="export-buttons">
-                <button
-                  className="export-button"
-                  onClick={handleExport}
-                  disabled={loading}
-                >
-                  JSONエクスポート
-                </button>
-                <button
-                  className="export-button"
-                  onClick={handleDownloadZip}
-                  disabled={loading}
-                >
-                  ZIPダウンロード
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="loading">セグメントを読み込み中...</div>
-          )}
-
-          {progressData && (
-            <div className="progress">
-              <div className="progress-title">進捗状況</div>
-              <div className="progress-stats">
-                <div className="stat kept">
-                  <span className="stat-number">{progressData.kept}</span>
-                  <span className="stat-label">残す</span>
-                </div>
-                <div className="stat dropped">
-                  <span className="stat-number">{progressData.dropped}</span>
-                  <span className="stat-label">捨てる</span>
-                </div>
-                <div className="stat pending">
-                  <span className="stat-number">{progressData.pending}</span>
-                  <span className="stat-label">未判定</span>
-                </div>
-              </div>
-            </div>
-          )}
+            <p className="keyboard-hint">キーボード: ← 外す / → 残す</p>
+          </section>
+          <Progress data={progressData} />
         </>
-      )}
+      ) : isAllDone ? (
+        <>
+          <section className="card complete-card">
+            <h2>選別できました</h2>
+            <p>{progressData.kept}個の場面を残します。</p>
+            <div className="export-buttons">
+              <button className="export-button" onClick={handleExport} disabled={loading}>結果をJSONで保存</button>
+              <button className="export-button" onClick={handleDownloadZip} disabled={loading}>動画をZIPで保存</button>
+              <button className="secondary-button" onClick={reset} disabled={loading}>別の動画を選ぶ</button>
+            </div>
+          </section>
+          <Progress data={progressData} />
+        </>
+      ) : null}
 
       {loading && (
-        <div className="loading">
-          <div className="spinner"></div>
-          <p>処理中...</p>
-          {uploadProgress > 0 && (
+        <div className="loading" role="status">
+          <div className="spinner" />
+          <p>{processingProgress ? 'ブラウザ内で動画を分割中…' : 'ZIPを作成中…'}</p>
+          {processingProgress > 0 && (
             <div className="progress-container">
-              <div className="progress-bar">
-                <div 
-                  className="progress-fill" 
-                  style={{ width: `${uploadProgress}%` }}
-                ></div>
-              </div>
-              <p className="progress-text">
-                {Math.round(uploadProgress)}% 完了
-                {estimatedTime && (
-                  <span className="estimated-time">
-                    （残り約{Math.max(0, Math.ceil(estimatedTime * (100 - uploadProgress) / 100))}秒）
-                  </span>
-                )}
-              </p>
-              <p className="warning-text">
-                ⚠️ アップロード中です。タブを切り替えずにお待ちください。
-              </p>
+              <div className="progress-bar"><div className="progress-fill" style={{ width: `${processingProgress}%` }} /></div>
+              <p className="progress-text">{processingProgress}%</p>
+              <p className="warning-text">処理が終わるまで、このタブを閉じないでください。</p>
             </div>
           )}
         </div>
       )}
-    </div>
+    </main>
+  );
+}
+
+function Progress({ data }) {
+  return (
+    <section className="progress" aria-label="選別の進捗">
+      <div className="progress-title">進捗</div>
+      <div className="progress-stats">
+        <div className="stat kept"><span className="stat-number">{data.kept}</span><span className="stat-label">残す</span></div>
+        <div className="stat dropped"><span className="stat-number">{data.dropped}</span><span className="stat-label">外す</span></div>
+        <div className="stat pending"><span className="stat-number">{data.pending}</span><span className="stat-label">未判定</span></div>
+      </div>
+    </section>
   );
 }
 
