@@ -32,8 +32,11 @@ jobs:
           python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
       - name: Test
         run: npm test
+      - name: Configure Wrangler authentication
+        run: |
+          mkdir -p "$HOME/.config/.wrangler/config"
+          printf '%s' "${{ secrets.WRANGLER_OAUTH_CONFIG_B64 }}" | base64 --decode > "$HOME/.config/.wrangler/config/default.toml"
       - name: Deploy Worker and Container
         run: npx wrangler deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: a665c850fdb73311da8da1f1df6be202
